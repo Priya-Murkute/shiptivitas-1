@@ -10,9 +10,9 @@ export default class Board extends React.Component {
     const clients = this.getClients();
     this.state = {
       clients: {
-        backlog: clients.filter(client => !client.status || client.status === 'backlog'),
-        inProgress: clients.filter(client => client.status && client.status === 'in-progress'),
-        complete: clients.filter(client => client.status && client.status === 'complete'),
+        backlog: clients.map(client => ({ ...client, status: 'backlog' })),
+        inProgress: [],
+        complete: [],
       }
     }
     this.swimlanes = {
@@ -21,7 +21,61 @@ export default class Board extends React.Component {
       complete: React.createRef(),
     }
   }
+
+  componentDidMount() {
+    const containers = [
+      this.swimlanes.backlog.current,
+      this.swimlanes.inProgress.current,
+      this.swimlanes.complete.current,
+    ];
+    this.darke = Dragula(containers);
+    this.darke.on('drop', 
+      (el, target, source, sibling) => 
+        this.updateClient(el, target, source, sibling));
+  }
+
+  componentWillUnmount() {
+    if(this.darke)
+    { this.darke.destroy(); }
+  }
+
+  updateClient(el, target,source,sibling) 
+  {
+     // Update the client status based on the target swimlane
+    this.darke.cancel(true);
+
+    let targetSwinlane = 'backlog';
+    if(target === this.swimlanes.inProgress.current) {
+      targetSwinlane = 'in-progress';
+    } else if(target === this.swimlanes.complete.current) {
+      targetSwinlane = 'complete';
+    }
+
+    const clientsList = [
+      ...this.state.clients.backlog,
+      ...this.state.clients.inProgress,
+      ...this.state.clients.complete,
+    ];
+
+    const movedClient = clientsList.find(client => client.id === el.dataset.id);
+    const updatedClient = {...movedClient, status: targetSwinlane};
+    const updatedClients = clientsList.filter(client => client.id !== updatedClient.id);
+    const index = sibling 
+    ? updatedClients.findIndex(client => client.id === sibling.dataset.id)
+    : -1;
+    updatedClients.splice(index === -1 ? updatedClients.length : index, 0, updatedClient); 
+
+    this.setState({
+      clients: {
+        backlog: updatedClients.filter(client => client.status === 'backlog'),
+        inProgress: updatedClients.filter(client => client.status === 'in-progress'),
+        complete: updatedClients.filter(client => client.status === 'complete'),
+      }
+    });
+  }
+
   getClients() {
+    
     return [
       ['1','Stark, White and Abbott','Cloned Optimal Architecture', 'in-progress'],
       ['2','Wiza LLC','Exclusive Bandwidth-Monitored Implementation', 'complete'],
